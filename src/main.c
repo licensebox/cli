@@ -25,6 +25,7 @@ static void usage(void){
       "Options: --server URL --directory DIR --version APP_VERSION --ca-bundle PEM\n"
       "Commands:\n"
       "  require MODULE                 Print authorized only after a successful check\n"
+      "  heartbeat MODULE               Force signed renewal; print authorized only\n"
       "  status                         Print local verified product/modules/expiry\n"
       "  sign-in [--timeout SECONDS]     Display sign-in URI and code on stderr\n"
       "  logout                         Retain installation key; clear authorization\n"
@@ -78,7 +79,7 @@ int main(int argc,char **argv){
  }
  if(!product||!keys_path||i>=argc)goto invalid;
  command=argv[i++];operation=command;
- if(!strcmp(command,"require")){
+ if(!strcmp(command,"require")||!strcmp(command,"heartbeat")){
   if(i+1!=argc)goto invalid;add_string(args,"module",argv[i++]);
  }else if(!strcmp(command,"sign-in")){
   operation="sign_in";double timeout=120;
@@ -119,7 +120,7 @@ int main(int argc,char **argv){
  }
  if(!output){exit_code=failure("protocol_error",1);goto cleanup;}
  exit_code=0;
- if(!strcmp(command,"require")||!strcmp(command,"sign-in"))puts("authorized");
+ if(!strcmp(command,"require")||!strcmp(command,"heartbeat")||!strcmp(command,"sign-in"))puts("authorized");
  else if(!strcmp(command,"status"))exit_code=output_status(output);
  else if(!strcmp(command,"access-link")){
   J *url=json_tokener_parse(output);if(!json_object_is_type(url,json_type_string))exit_code=failure("protocol_error",1);else puts(json_object_get_string(url));json_object_put(url);

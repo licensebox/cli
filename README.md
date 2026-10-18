@@ -58,3 +58,30 @@ python3 ../protocol/conformance/run.py --adapter bash "$PWD/ci/adapter.sh"
 ```
 
 The shared suite validates the common dispatcher/native contract; installed production flag parsing and output behavior are covered separately by `tests/integration.py`. The adapter is never installed or exposed as a CLI option. All test keys, records, URLs and hosts are synthetic.
+
+## Optional shell checkpoints
+
+```sh
+if licensebox --product myapp --keys public-keys.json heartbeat core; then
+    # Process only the next bounded protected unit here.
+    :
+else
+    # Pause safely and preserve application results.
+    exit 1
+fi
+```
+
+`heartbeat MODULE` forces one signed three-second renewal without interactive
+sign-in, key creation/rotation or seat transfer. It prints only `authorized` on
+successful authorization; lease JSON, keys and sign-in secrets are never printed.
+Its nonzero exit and stable stderr code fail closed. An eligible outage can
+succeed only while the verified saved lease remains unexpired; a refusal or
+missing module cannot reuse old authorization. It also works with legacy leases
+without a heartbeat policy. Missing state returns `not_signed_in`.
+
+The shell owns scheduling and protected commands; the CLI never launches them.
+Use `status` for the verified signed expiry and stop by that deadline, even if a
+checkpoint is slow. No failed checkpoint extends it. No background process is
+started by normal require/sign-in/status commands. Configure server heartbeat
+policy for shorter contact windows; a bounded command-start check alone does not
+monitor arbitrarily long work.

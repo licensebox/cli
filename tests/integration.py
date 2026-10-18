@@ -54,6 +54,7 @@ class Handler(BaseHTTPRequestHandler):
             Ed25519PublicKey.from_public_bytes(dec(state.machine)).verify(dec(data['signature']),message.encode())
             if op=='device': return self.reply(200,dict(device_code='synthetic-device-code',user_code='SYNTH-CLI',verification_uri='https://example.invalid/activate',verification_uri_complete='https://example.invalid/activate?code=SYNTH-CLI',expires_in=60,interval=0,interval_ms=1))
             if op=='token': return self.reply(200,dict(lease=lease(),usage=True))
+            if state.mode=='offline' and op=='renew':return self.reply(503,dict(error='temporarily_unavailable'))
             if state.mode=='deny':return self.reply(403,dict(error='location_denied',error_description='Synthetic refusal'))
             payload=json.loads(data['payload'])
             if op=='renew':state.counts.extend(payload.get('usage',[]));return self.reply(200,dict(lease=lease(),usage=True))
@@ -84,9 +85,21 @@ def main():
             return p
         try:
             run('status',code=1,error='not_signed_in')
+            run('heartbeat','core',code=1,error='not_signed_in');assert state.seen==[]
             result=run('sign-in','--timeout','3');assert result.stdout=='authorized\n'
             assert 'https://example.invalid/activate' in result.stderr and 'SYNTH-CLI' in result.stderr
             assert run('require','core').stdout=='authorized\n'
+            before=state.seen.count('renew')
+            for _ in range(2):
+                heartbeat=run('heartbeat','core');assert heartbeat.stdout=='authorized\n' and heartbeat.stderr==''
+            assert state.seen.count('renew')==before+2
+            run('heartbeat','missing',code=1,error='module_denied')
+            run('heartbeat','',code=2,error='invalid_argument')
+            saved=(root/'state/lease').read_text();state.mode='offline'
+            assert run('heartbeat','core').stdout=='authorized\n'
+            assert (root/'state/lease').read_text()==saved
+            state.mode=''
+
             status=json.loads(run('status').stdout);assert set(status)=={'product','modules','expires'} and status['modules']==['core']
             assert json.loads(run('modules').stdout)[0]['name']=='core'
             assert json.loads(run('requests').stdout)==[]
@@ -100,8 +113,9 @@ def main():
             run('require','core','unexpected',code=2,error='invalid_argument')
             run('record','export','--success','--elapsed','nan',code=2,error='invalid_argument')
             run('--binding','m1:forbidden','require','core',code=2,error='invalid_argument')
-            state.mode='deny';run('require','core',code=1,error='location_denied')
+            state.mode='deny';run('heartbeat','core',code=1,error='location_denied')
             server.shutdown();server.server_close();worker.join()
+            run('heartbeat','core',code=1,error='location_denied')
             run('require','core',code=1,error='location_denied')
             run('status',code=1,error='location_denied')
             assert run('logout').stdout=='logged_out\n'
