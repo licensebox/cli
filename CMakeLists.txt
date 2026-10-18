@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(licensebox_cli VERSION 0.1.0 LANGUAGES C)
+project(licensebox_cli VERSION 0.2.0 LANGUAGES C)
 include(GNUInstallDirs)
 find_path(LICENSEBOX_INCLUDE_DIR licensebox_json.h HINTS "$ENV{LICENSEBOX_LIB_DIR}/../include" REQUIRED)
 find_library(LICENSEBOX_LIBRARY licensebox HINTS "$ENV{LICENSEBOX_LIB_DIR}" REQUIRED)

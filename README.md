@@ -1,6 +1,6 @@
 # Licensebox CLI for shell scripts
 
-Linux native application licensing for POSIX shell, Bash, Fish and PowerShell. The `licensebox` executable delegates to the maintained Licensebox C v0.3.0 library. It contains no server administration functionality, private signing keys or application source.
+Linux native application licensing for POSIX shell, Bash, Fish and PowerShell. The `licensebox` executable delegates to the maintained Licensebox C v0.4.0 library. It contains no server administration functionality, private signing keys or application source.
 
 Build/install the native library with `bash scripts/install-native.sh /your/prefix`, then build the CLI:
 
