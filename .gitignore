@@ -1,0 +1,14 @@
+build/
+*.o
+*.ppu
+*.mod
+.dub/
+nimcache/
+zig-out/
+.zig-cache/
+.native*/
+*.a
+*.so
+*.so.*
+*.exe
+licensebox
