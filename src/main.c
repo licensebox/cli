@@ -60,7 +60,7 @@ static int output_status(const char *text){
 }
 int main(int argc,char **argv){
  if(argc==2&&!strcmp(argv[1],"--help")){usage();return 0;}
- if(argc==2&&!strcmp(argv[1],"--sdk-version")){puts("licensebox-cli 0.2.0 (native C 0.4.0)");return 0;}
+ if(argc==2&&!strcmp(argv[1],"--sdk-version")){puts("licensebox-cli 0.3.0 (native C 0.5.0)");return 0;}
  int i=1,exit_code=2;const char *keys_path=NULL,*product=NULL,*command=NULL,*operation=NULL;
  J *options=json_object_new_object(),*args=json_object_new_object(),*keys=NULL;
  lb_client *client=NULL;char *output=NULL;
