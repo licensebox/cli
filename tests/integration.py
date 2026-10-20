@@ -13,12 +13,23 @@ import tempfile
 import threading
 import time
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+from cryptography.hazmat.primitives.asymmetric.mldsa import MLDSA65PrivateKey, MLDSA65PublicKey
 
 def enc(data): return base64.urlsafe_b64encode(data).decode().rstrip('=')
 def dec(data): return base64.urlsafe_b64decode(data+'='*(-len(data)%4))
 def stamp(now): return datetime.fromtimestamp(now, timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-signer=Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
-public=enc(signer.public_key().public_bytes_raw())
+ALG='ed25519-mldsa65'
+# Protocol v3: Ed25519 and ML-DSA-65 over the same message; both must verify.
+class Signer:
+    def __init__(self,seed): self.ed=Ed25519PrivateKey.from_private_bytes(seed[:32]); self.ml=MLDSA65PrivateKey.from_seed_bytes(seed[32:])
+    def public(self): return ALG+':'+enc(self.ed.public_key().public_bytes_raw()+self.ml.public_key().public_bytes_raw())
+    def sign(self,message): return self.ed.sign(message)+self.ml.sign(message)
+def verify(key,signature,message):
+    alg,_,data=key.partition(':');raw=dec(data);assert alg==ALG and len(signature)==64+3309
+    Ed25519PublicKey.from_public_bytes(raw[:32]).verify(signature[:64],message)
+    MLDSA65PublicKey.from_public_bytes(raw[32:]).verify(signature[64:],message)
+signer=Signer(bytes(range(64)))
+public=signer.public()
 class State:
     machine=''
     binding=''
@@ -29,8 +40,8 @@ class State:
 state=State()
 def lease():
     now=int(time.time())
-    payload=json.dumps(dict(v=2,kid='synthetic',product='demo',user='synthetic-user',email='test@example.invalid',machine=state.machine,binding=state.binding,modules=['core'],issued=stamp(now),expires=stamp(now+86400),terms=1),separators=(',',':')).encode()
-    return enc(payload)+'.'+enc(signer.sign(b'licensebox lease v2\n'+payload))
+    payload=json.dumps(dict(v=3,kid='synthetic',product='demo',user='synthetic-user',email='test@example.invalid',machine=state.machine,binding=state.binding,modules=['core'],issued=stamp(now),expires=stamp(now+86400),terms=1),separators=(',',':')).encode()
+    return enc(payload)+'.'+enc(signer.sign(f'licensebox lease v3\n{ALG}\n'.encode()+payload))
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args): pass
     def reply(self,status,value):
@@ -42,16 +53,16 @@ class Handler(BaseHTTPRequestHandler):
             if op=='device':
                 assert data['product']=='demo' and data['binding'].startswith('m1:linux-')
                 state.machine=data['machine'];state.binding=data['binding']
-                message=f"licensebox device v2\ndemo\n{state.binding}\n{data['time']}"
+                message=f"licensebox device v3\n{ALG}\ndemo\n{state.binding}\n{data['time']}"
             elif op=='token':
                 assert data['device_code']=='synthetic-device-code'
-                message=f"licensebox token v2\nsynthetic-device-code\n{state.binding}\n{data['time']}"
+                message=f"licensebox token v3\n{ALG}\nsynthetic-device-code\n{state.binding}\n{data['time']}"
             else:
                 assert data['binding']==state.binding
                 token=data['lease'];payload,signature=token.split('.')
-                signer.public_key().verify(dec(signature),b'licensebox lease v2\n'+dec(payload))
-                message=f"licensebox {op} v2\n{token}\n{state.binding}\n{data['time']}\n{hashlib.sha256(data['payload'].encode()).hexdigest()}"
-            Ed25519PublicKey.from_public_bytes(dec(state.machine)).verify(dec(data['signature']),message.encode())
+                verify(public,dec(signature),f'licensebox lease v3\n{ALG}\n'.encode()+dec(payload))
+                message=f"licensebox {op} v3\n{ALG}\n{token}\n{state.binding}\n{data['time']}\n{hashlib.sha256(data['payload'].encode()).hexdigest()}"
+            verify(state.machine,dec(data['signature']),message.encode())
             if op=='device': return self.reply(200,dict(device_code='synthetic-device-code',user_code='SYNTH-CLI',verification_uri='https://example.invalid/activate',verification_uri_complete='https://example.invalid/activate?code=SYNTH-CLI',expires_in=60,interval=0,interval_ms=1))
             if op=='token': return self.reply(200,dict(lease=lease(),usage=True))
             if state.mode=='offline' and op=='renew':return self.reply(503,dict(error='temporarily_unavailable'))

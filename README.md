@@ -14,7 +14,7 @@ cmake --install build --prefix /your/prefix
 
 Requires Linux, a C compiler, CMake 3.20+, json-c, OpenSSL and libcurl. On disposable Ubuntu CI, `bash ci/setup.sh` installs the CLI build prerequisites; the native dependency is installed separately. No other platform is validated. Add `/your/prefix/bin` to PATH. The executable resolves `liblicensebox.so` using the Linux loader; `LICENSEBOX_LIBRARY` is a CI convention and does not override that loader. The binary install contains only the executable and LICENSE.
 
-Create a JSON file containing administrator-provided **public** Ed25519 verification keys:
+Create a JSON file containing administrator-provided **public** verification keys (`ed25519-mldsa65:...`):
 
 ```json
 {"current":"YOUR_UNPADDED_BASE64URL_PUBLIC_KEY"}
