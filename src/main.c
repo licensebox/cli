@@ -33,6 +33,9 @@ static void usage(void){
       "  request MODULE... [--note TEXT]\n"
       "  access-link                    Explicitly print a private access URL\n"
       "  record COMMAND (--success|--failed) --elapsed SECONDS\n"
+      "  enrol                          Enrol a service account with LICENSEBOX_ENROL_TOKEN\n"
+      "  checkout MODULE                Check a floating copy out; print authorized\n"
+      "  checkin [MODULE...]            Return floating copies (all with none named)\n"
       "This program authorizes access; the calling shell controls subsequent work.");
 }
 static J *read_keys(const char *path){
@@ -60,7 +63,7 @@ static int output_status(const char *text){
 }
 int main(int argc,char **argv){
  if(argc==2&&!strcmp(argv[1],"--help")){usage();return 0;}
- if(argc==2&&!strcmp(argv[1],"--sdk-version")){puts("licensebox-cli 0.3.0 (native C 0.5.0)");return 0;}
+ if(argc==2&&!strcmp(argv[1],"--sdk-version")){puts("licensebox-cli 0.4.0 (native C 0.6.0)");return 0;}
  int i=1,exit_code=2;const char *keys_path=NULL,*product=NULL,*command=NULL,*operation=NULL;
  J *options=json_object_new_object(),*args=json_object_new_object(),*keys=NULL;
  lb_client *client=NULL;char *output=NULL;
@@ -79,8 +82,17 @@ int main(int argc,char **argv){
  }
  if(!product||!keys_path||i>=argc)goto invalid;
  command=argv[i++];operation=command;
- if(!strcmp(command,"require")||!strcmp(command,"heartbeat")){
+ if(!strcmp(command,"require")||!strcmp(command,"heartbeat")||!strcmp(command,"checkout")){
   if(i+1!=argc)goto invalid;add_string(args,"module",argv[i++]);
+ }else if(!strcmp(command,"enrol")){
+  /* The token comes from the environment, never argv, where other users of
+   * the machine could read it. */
+  const char *token=getenv("LICENSEBOX_ENROL_TOKEN");
+  if(!token||!*token){exit_code=failure("invalid_token",2);goto cleanup;}
+  add_string(args,"token",token);
+ }else if(!strcmp(command,"checkin")){
+  J *modules=json_object_new_array();json_object_object_add(args,"modules",modules);
+  while(i<argc){if(argv[i][0]=='-')goto invalid;json_object_array_add(modules,json_object_new_string(argv[i++]));}
  }else if(!strcmp(command,"sign-in")){
   operation="sign_in";double timeout=120;
   if(i<argc){if(i+2!=argc||strcmp(argv[i],"--timeout")||!number(argv[i+1],&timeout)||timeout<=0)goto invalid;i+=2;}
@@ -120,7 +132,8 @@ int main(int argc,char **argv){
  }
  if(!output){exit_code=failure("protocol_error",1);goto cleanup;}
  exit_code=0;
- if(!strcmp(command,"require")||!strcmp(command,"heartbeat")||!strcmp(command,"sign-in"))puts("authorized");
+ if(!strcmp(command,"require")||!strcmp(command,"heartbeat")||!strcmp(command,"sign-in")||!strcmp(command,"checkout")||!strcmp(command,"enrol"))puts("authorized");
+ else if(!strcmp(command,"checkin"))puts("checked_in");
  else if(!strcmp(command,"status"))exit_code=output_status(output);
  else if(!strcmp(command,"access-link")){
   J *url=json_tokener_parse(output);if(!json_object_is_type(url,json_type_string))exit_code=failure("protocol_error",1);else puts(json_object_get_string(url));json_object_put(url);

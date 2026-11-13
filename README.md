@@ -1,6 +1,6 @@
 # Licensebox CLI for shell scripts
 
-Linux native application licensing for POSIX shell, Bash, Fish and PowerShell. The `licensebox` executable delegates to the maintained Licensebox C v0.5.0 library. It contains no server administration functionality, private signing keys or application source.
+Linux native application licensing for POSIX shell, Bash, Fish and PowerShell. The `licensebox` executable delegates to the maintained Licensebox C v0.6.0 library. It contains no server administration functionality, private signing keys or application source.
 
 Build/install the native library with `bash scripts/install-native.sh /your/prefix`, then build the CLI:
 
@@ -85,3 +85,18 @@ checkpoint is slow. No failed checkpoint extends it. No background process is
 started by normal require/sign-in/status commands. Configure server heartbeat
 policy for shorter contact windows; a bounded command-start check alone does not
 monitor arbitrarily long work.
+
+## Seats per module, floating copies and service accounts
+
+Commands: `licensebox ... enrol` (token from `LICENSEBOX_ENROL_TOKEN`, never the command line), `checkout MODULE`, `checkin [MODULE...]`; `require` also enrols when `LICENSEBOX_ENROL_TOKEN` is set.
+
+A module can have seats of its own: on a machine without its seat the lease
+names it in `elsewhere`, requiring it fails with `module_denied`, and an
+explicit sign-in moves the seat here. A customer can hold a pool of floating
+copies of a module, named in the lease's `floating`: requiring such a module
+checks a copy out (`no_free_copy` when every copy is in use), heartbeats keep
+it, and checking in returns it. A crashed application's copy is freed when
+the heartbeat grace passes. A server or build runner licensed as a service
+account sets the one-time token an admin issued as `LICENSEBOX_ENROL_TOKEN`
+or the `enrol_token` option: its first lease enrols the machine without a
+browser (`invalid_token` when the token is used or expired).
